@@ -1,0 +1,134 @@
+{
+  function node(name, attributes, content){
+    var x$, that;
+    x$ = {
+      node: name
+    };
+    if (that = attributes) {
+      x$.attrs = that;
+    }
+    if (content && content.length) {
+      x$.content = content;
+    }
+    return x$;
+  }
+
+  function reduceToObj(xs){
+    var x$, attr, setField, i$, y$, len$;
+    x$ = attr = {};
+    setField = function(x){
+      if (x && x.name) {
+        return attr[x.name] = x.text;
+      }
+    };
+    for (i$ = 0, len$ = xs.length; i$ < len$; ++i$) {
+      y$ = xs[i$];
+      setField(y$);
+    }
+    return x$;
+  }
+}
+
+/**
+ * Document is just a collection of elements.
+ */
+Document = nodes:Element* { return nodes; }
+
+/**
+ * Elements - https://www.w3.org/TR/html5/syntax.html#elements-0
+ */
+Element  = RawText / Nested / Void / Comment / DocType / Text
+
+RawText  = Script / Style / Textarea / Title / PlainText
+
+Script    "script"    = '<script'    attrs:Attributes '>' __ content:(ch:(!('</script'    __ '>') c:. { return c; })* { return ch.join(''); }) __ '</script'i    __ '>' __ { 
+  return node('script', attrs, content); }
+Style     "style"     = '<style'i     attrs:Attributes '>' __ content:(ch:(!('</style'i     __ '>') c:. { return c; })* { return ch.join(''); }) __ '</style'i     __ '>' __ { return node('style', attrs, content); }
+Textarea  "textarea"  = '<textarea'i  attrs:Attributes '>' __ content:(ch:(!('</textarea'i  __ '>') c:. { return c; })* { return ch.join(''); }) __ '</textarea'i  __ '>' __ { return node('textarea', attrs, content); }
+Title     "title"     = '<title'i     attrs:Attributes '>' __ content:(ch:(!('</title'i     __ '>') c:. { return c; })* { return ch.join(''); }) __ '</title'i     __ '>' __ { return node('title', attrs, content); }
+PlainText "plaintext" = '<plaintext'i attrs:Attributes '>' __ content:(ch:(!('</plaintext'i __ '>') c:. { return c; })* { return ch.join(''); }) __ '</plaintext'i __ '>' __ { return node('plaintext', attrs, content); }
+
+Nested    "element"   = begin:TagBegin __ content:Element* __ end:TagEnd __ &{ if (begin) { begin.node == end } } {
+  return node(begin.node, begin.attrs, content);
+}
+
+TagBegin  "begin tag" = '<'  name:Symbol attrs:Attributes '>' {
+  if (name && name.length) {
+    return node(name.toLowerCase(), attrs);
+  }
+}
+TagEnd    "end tag"   = '</' name:Symbol __               '>' {
+  if (name && name.length) {
+    return name.toLowerCase();
+  }
+}
+
+/**
+ * Void element (with self closing tag, w/o content)
+ * - 'area'i / 'base'i / 'br'i / 'col'i / 'embed'i / 'hr'i / 'img'i / 'input'i / 'keygen'i / 'link'i / 'meta'i / 'param'i / 'source'i / 'track'i / 'wbr'i
+ */
+Void      "element"   = '<' name:Symbol attrs:Attributes ('/>' / '>') __ { return node(name, attrs); }
+
+Comment   "comment"   = '<!--' text:CommentText '-->' __ {
+  return node('comment', void 8, text);
+}
+
+CommentText = ch:(!'-->' c:. { c })* { return ch.join(''); }
+
+DocType   "doctype"   = '<!DOCTYPE'i __ root:Symbol __ type:('public'i / 'system'i)? __ text:String* '>' __ {
+  var x$, that;
+
+  var obj = node('doctype');
+
+  if (root) {
+    obj.root = root.toLowerCase();
+  }
+
+  if (type) {
+    obj.type = type.toLowerCase();
+  }
+
+  if (text && text.length) {
+    obj.content = text;
+  }
+
+  return obj;
+}
+
+Text "text"
+  = ch:(c:[^<] { return c; })+ {
+    return node('text', void 8, ch.join(''));
+
+  }
+  / ch:(!TagEnd !Void !Comment !DocType c:. { return c; })+ {
+    return node('text', void 8, ch.join(''));
+  }
+
+/**
+ * Element attributes
+ */
+Attributes = __ attrs:Attribute* __ {
+  if (attrs && attrs.length) {
+    return reduceToObj(attrs);
+  }
+}
+
+Attribute "attribute"
+  = name:Symbol __ text:(__ '=' __ s:String { s })? __ { return {name, text}; }
+  / !'/>' [^> ]+ __ { return;/*void*/ }
+
+/**
+ * String - single, double, w/o quotes
+ */
+String "string"
+  = '"'  ch:[^"]*      '"'  __ { return ch.join(''); }
+  / '\'' ch:[^']*      '\'' __ { return ch.join(''); }
+  /      ch:[^"'<>` ]+      __ { return ch.join(''); }
+
+/**
+ * Tag name, attribute name
+ */
+Symbol = h:[a-zA-Z0-9_\-] t:[a-zA-Z0-9:_\-]* { return h.concat(t.join('')); }
+
+__ "space characters"
+  = [\r\n \t\u000C]*

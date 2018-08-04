@@ -1,0 +1,86 @@
+{
+  function createNode(name, attributes, content){
+    var nodeObj = {
+      node: name
+    };
+
+    if (attributes) {
+      nodeObj.attrs = attributes;
+    }
+
+    if (content && content.length) {
+      nodeObj.content = content;
+    }
+
+    return nodeObj;
+  }
+
+  function reduceToObj(xs){
+    // console.log(xs)
+
+    var x$, attr, setField, i$, y$, len$;
+
+    var attrObj = attr = {};
+    var attr = attrObj;
+
+    setField = function(x){
+      if (x && x.name) {
+        return attr[x.name] = x.text;
+      }
+    };
+
+    for (i$ = 0, len$ = xs.length; i$ < len$; ++i$) {
+      y$ = xs[i$];
+      setField(y$);
+    }
+    return x$;
+  }
+}
+
+/**
+ * Document is just a collection of elements.
+ */
+Document = nodes:Element* {
+  console.log(nodes);
+  return nodes;
+}
+
+/**
+ * Elements - https://www.w3.org/TR/html5/syntax.html#elements-0gbvf
+ */
+Element  = Script / DocType
+
+DocType "doctype" = '<!doctype html>' {
+  var doctypeObj = createNode('doctype');
+
+  // if (root) doctypeObj.root = root;
+  // if (type) doctypeObj.type = type;
+  // if (text && text.length) doctypeObj.text = text;
+
+  // console.log(doctypeObj);
+
+  return doctypeObj;
+}
+
+Script "script" = '<script' ' '? attrs:Src '></script>' {
+  // console.log(attrs);
+  return attrs;
+}
+
+Src "src" = 'src="test"'
+
+/* Element attributes */
+Attributes = attrs:Attribute {
+  if (attrs && attrs.length) {
+    return reduceToObj(attrs);
+  }
+}
+
+Attribute "attribute" = name:Symbol { 
+  return { name };
+}
+
+/**
+ * Tag name, attribute name
+ */
+Symbol = [a-zA-Z0-9_\-]
